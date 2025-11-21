@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gate Pass System (Online DB)</title>
+    <title>Gate Pass System</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -12,8 +12,14 @@
         .input-box { flex: 1; min-width: 180px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
         input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
+        
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .save-btn { background-color: #007bff; color: white; }
+        .save-btn:hover { background-color: #0056b3; }
+        .export-btn { background-color: #28a745; color: white; margin-right: 10px; }
+        .db-btn { background-color: #6c757d; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; display: inline-block; }
+        .clear-btn { background-color: #dc3545; color: white; float: right; font-size: 12px; padding: 5px 10px; }
+
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background-color: #333; color: white; }
@@ -23,7 +29,7 @@
 <body>
 
 <div class="container">
-    <h2>Gate Pass Record (Connected to Database)</h2>
+    <h2>Gate Pass Inventory Recorder</h2>
 
     <form name="submit-to-google-sheet" id="gpForm">
         <div class="form-group">
@@ -37,9 +43,12 @@
             </div>
             <div class="input-box">
                 <label>Destination</label>
-                <input type="text" name="Destination" list="factories" placeholder="Factory Name">
+                <input type="text" name="Destination" list="factories" placeholder="Factory Name" required>
                 <datalist id="factories">
-                    <option value="Factory A"><option value="Factory B"><option value="Supplier X">
+                    <option value="Factory 3">
+                    <option value="Factory 4">
+                    <option value="Factory 5">
+                    <option value="Other">
                 </datalist>
             </div>
         </div>
@@ -54,94 +63,134 @@
                 <input type="number" name="Quantity" id="qty" placeholder="0" required>
             </div>
             <div style="align-self: flex-end;">
-                <button type="submit">Save to Database</button>
+                <button type="submit" class="save-btn">Save to Database</button>
             </div>
         </div>
         <p class="loading" id="statusMsg">Saving to Database... Please wait.</p>
     </form>
 
     <hr>
-    <h3>Recent Local History</h3>
+    
+    <h3>Recent Local History <button onclick="clearLocalData()" class="clear-btn">Clear History</button></h3>
+    <div style="margin-bottom: 15px;">
+        <button onclick="exportTableToCSV('GatePass_Report.csv')" class="export-btn">Download Excel (.csv)</button>
+        <a href="https://docs.google.com/spreadsheets" target="_blank" class="db-btn">Open Full Database</a>
+    </div>
+
     <table id="recordTable">
         <thead>
             <tr><th>Date</th><th>GP No</th><th>Dest</th><th>Item</th><th>Qty</th></tr>
         </thead>
         <tbody></tbody>
-        <button onclick="exportTableToCSV('GatePass_Report.csv')" style="background-color:green; color:white; margin-top:10px;">
-    Download Excel (.csv)
-</button>
     </table>
 </div>
 
 <script>
-    // --- IMPORTANT: PASTE YOUR GOOGLE SCRIPT URL BELOW ---
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbzfMC_u4CF5yqkDFGd8WfS1P1nvs7wtXygwtY89zqkl6mYo26DU4_stG0F062l0VxEu/exec';
-    // -----------------------------------------------------
+    // -------------------------------------------------------
+    // ⚠️ PASTE YOUR GOOGLE SCRIPT URL INSIDE THE QUOTES BELOW
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbzfMC_u4CF5yqkDFGd8WfS1P1nvs7wtXygwtY89zqkl6mYo26DU4_stG0F062l0VxEu/exec'; 
+    // -------------------------------------------------------
 
     const form = document.forms['submit-to-google-sheet'];
     const statusMsg = document.getElementById('statusMsg');
 
-    // Set Default Date
-    document.getElementById('dateEntry').valueAsDate = new Date();
+    // 1. On Load: Set Date and Load History
+    window.onload = function() {
+        document.getElementById('dateEntry').valueAsDate = new Date();
+        loadLocalTable();
+    };
 
+    // 2. Submit Function
     form.addEventListener('submit', e => {
         e.preventDefault();
         statusMsg.style.display = 'block';
 
+        // Send to Google Sheet
         fetch(scriptURL, { method: 'POST', body: new FormData(form)})
             .then(response => {
                 statusMsg.style.display = 'none';
                 alert("Success! Data saved to Google Sheet.");
                 
-                // Add to local table for visual confirmation
-                addToLocalTable();
+                // Save to Local Memory
+                saveToLocalMemory();
                 
-                // Clear only Item and Qty for next entry
+                // Clear only Item and Qty
                 document.getElementById('item').value = "";
                 document.getElementById('qty').value = "";
             })
             .catch(error => {
                 statusMsg.style.color = 'red';
-                statusMsg.innerText = "Error! Check internet connection.";
+                statusMsg.innerText = "Error! Check connection or Script URL.";
                 console.error('Error!', error.message);
             });
     });
 
-    function addToLocalTable() {
-        const tbody = document.querySelector('#recordTable tbody');
+    // 3. Save to Local Storage (Browser Memory)
+    function saveToLocalMemory() {
         const date = document.getElementById('dateEntry').value;
         const gp = document.getElementById('gpNo').value;
         const dest = document.querySelector('input[name="Destination"]').value;
         const item = document.getElementById('item').value;
         const qty = document.getElementById('qty').value;
 
-        let row = `<tr><td>${date}</td><td>${gp}</td><td>${dest}</td><td>${item}</td><td>${qty}</td></tr>`;
-        tbody.innerHTML = row + tbody.innerHTML;
-    }
-    function exportTableToCSV(filename) {
-    var csv = [];
-    var rows = document.querySelectorAll("table tr");
-    
-    for (var i = 0; i < rows.length; i++) {
-        var row = [], cols = rows[i].querySelectorAll("td, th");
+        const record = { date, gp, dest, item, qty };
         
-        for (var j = 0; j < cols.length; j++) 
-            row.push(cols[j].innerText);
+        // Get existing data
+        let records = JSON.parse(localStorage.getItem('gp_history')) || [];
+        records.push(record);
         
-        csv.push(row.join(","));        
+        // Save back
+        localStorage.setItem('gp_history', JSON.stringify(records));
+        
+        // Refresh Table
+        loadLocalTable();
     }
 
-    // Download Logic
-    var csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
-    var downloadLink = document.createElement("a");
-    downloadLink.download = filename;
-    downloadLink.href = window.URL.createObjectURL(csvFile);
-    downloadLink.style.display = "none";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-}
+    // 4. Load Table from Memory
+    function loadLocalTable() {
+        const tbody = document.querySelector('#recordTable tbody');
+        tbody.innerHTML = '';
+        let records = JSON.parse(localStorage.getItem('gp_history')) || [];
+        
+        // Show newest first
+        records.reverse().forEach(rec => {
+            let row = `<tr>
+                <td>${rec.date}</td>
+                <td>${rec.gp}</td>
+                <td>${rec.dest}</td>
+                <td>${rec.item}</td>
+                <td>${rec.qty}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+
+    // 5. Clear History
+    function clearLocalData() {
+        if(confirm("Clear local history? (Database will remain safe)")) {
+            localStorage.removeItem('gp_history');
+            loadLocalTable();
+        }
+    }
+
+    // 6. Export Function
+    function exportTableToCSV(filename) {
+        var csv = [];
+        var rows = document.querySelectorAll("table tr");
+        for (var i = 0; i < rows.length; i++) {
+            var row = [], cols = rows[i].querySelectorAll("td, th");
+            for (var j = 0; j < cols.length; j++) row.push(cols[j].innerText);
+            csv.push(row.join(","));        
+        }
+        var csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
+        var downloadLink = document.createElement("a");
+        downloadLink.download = filename;
+        downloadLink.href = window.URL.createObjectURL(csvFile);
+        downloadLink.style.display = "none";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+    }
 </script>
 
 </body>
-
 </html>
