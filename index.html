@@ -67,6 +67,9 @@
             <tr><th>Date</th><th>GP No</th><th>Dest</th><th>Item</th><th>Qty</th></tr>
         </thead>
         <tbody></tbody>
+        <button onclick="exportTableToCSV('GatePass_Report.csv')" style="background-color:green; color:white; margin-top:10px;">
+    Download Excel (.csv)
+</button>
     </table>
 </div>
 
@@ -115,7 +118,30 @@
         let row = `<tr><td>${date}</td><td>${gp}</td><td>${dest}</td><td>${item}</td><td>${qty}</td></tr>`;
         tbody.innerHTML = row + tbody.innerHTML;
     }
+    function exportTableToCSV(filename) {
+    var csv = [];
+    var rows = document.querySelectorAll("table tr");
+    
+    for (var i = 0; i < rows.length; i++) {
+        var row = [], cols = rows[i].querySelectorAll("td, th");
+        
+        for (var j = 0; j < cols.length; j++) 
+            row.push(cols[j].innerText);
+        
+        csv.push(row.join(","));        
+    }
+
+    // Download Logic
+    var csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
+    var downloadLink = document.createElement("a");
+    downloadLink.download = filename;
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+}
 </script>
 
 </body>
+
 </html>
