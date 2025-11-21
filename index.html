@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gate Pass System (Online DB)</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        .form-group { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 20px; }
+        .input-box { flex: 1; min-width: 180px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #333; color: white; }
+        .loading { color: orange; font-weight: bold; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Gate Pass Record (Connected to Database)</h2>
+
+    <form name="submit-to-google-sheet" id="gpForm">
+        <div class="form-group">
+            <div class="input-box">
+                <label>Date</label>
+                <input type="date" name="Date" id="dateEntry" required>
+            </div>
+            <div class="input-box">
+                <label>Gate Pass No</label>
+                <input type="text" name="Gate Pass No" id="gpNo" placeholder="GP-001" required>
+            </div>
+            <div class="input-box">
+                <label>Destination</label>
+                <input type="text" name="Destination" list="factories" placeholder="Factory Name">
+                <datalist id="factories">
+                    <option value="Factory A"><option value="Factory B"><option value="Supplier X">
+                </datalist>
+            </div>
+        </div>
+
+        <div class="form-group" style="border:none;">
+            <div class="input-box" style="flex:2;">
+                <label>Item Name</label>
+                <input type="text" name="Item Name" id="item" placeholder="Description" required>
+            </div>
+            <div class="input-box">
+                <label>Quantity</label>
+                <input type="number" name="Quantity" id="qty" placeholder="0" required>
+            </div>
+            <div style="align-self: flex-end;">
+                <button type="submit">Save to Database</button>
+            </div>
+        </div>
+        <p class="loading" id="statusMsg">Saving to Database... Please wait.</p>
+    </form>
+
+    <hr>
+    <h3>Recent Local History</h3>
+    <table id="recordTable">
+        <thead>
+            <tr><th>Date</th><th>GP No</th><th>Dest</th><th>Item</th><th>Qty</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    // --- IMPORTANT: PASTE YOUR GOOGLE SCRIPT URL BELOW ---
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbzfMC_u4CF5yqkDFGd8WfS1P1nvs7wtXygwtY89zqkl6mYo26DU4_stG0F062l0VxEu/exec';
+    // -----------------------------------------------------
+
+    const form = document.forms['submit-to-google-sheet'];
+    const statusMsg = document.getElementById('statusMsg');
+
+    // Set Default Date
+    document.getElementById('dateEntry').valueAsDate = new Date();
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        statusMsg.style.display = 'block';
+
+        fetch(scriptURL, { method: 'POST', body: new FormData(form)})
+            .then(response => {
+                statusMsg.style.display = 'none';
+                alert("Success! Data saved to Google Sheet.");
+                
+                // Add to local table for visual confirmation
+                addToLocalTable();
+                
+                // Clear only Item and Qty for next entry
+                document.getElementById('item').value = "";
+                document.getElementById('qty').value = "";
+            })
+            .catch(error => {
+                statusMsg.style.color = 'red';
+                statusMsg.innerText = "Error! Check internet connection.";
+                console.error('Error!', error.message);
+            });
+    });
+
+    function addToLocalTable() {
+        const tbody = document.querySelector('#recordTable tbody');
+        const date = document.getElementById('dateEntry').value;
+        const gp = document.getElementById('gpNo').value;
+        const dest = document.querySelector('input[name="Destination"]').value;
+        const item = document.getElementById('item').value;
+        const qty = document.getElementById('qty').value;
+
+        let row = `<tr><td>${date}</td><td>${gp}</td><td>${dest}</td><td>${item}</td><td>${qty}</td></tr>`;
+        tbody.innerHTML = row + tbody.innerHTML;
+    }
+</script>
+
+</body>
+</html>
