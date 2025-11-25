@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gate Pass System (Office 365)</title>
+    <title>Gate Pass System (Firebase)</title>
     <style>
+        /* Your Original CSS styles remain exactly the same */
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; }
+        h2 { text-align: center; color: #d32f2f; } /* Changed color to Firebase Orange/Red style */
         
-        /* Microsoft Excel Green Theme */
-        .save-btn { background-color: #107c41; color: white; }
-        .save-btn:hover { background-color: #0c5c30; }
+        .save-btn { background-color: #ffca28; color: #333; } /* Firebase Yellow */
+        .save-btn:hover { background-color: #ffb300; }
 
         .form-group { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 20px; }
         .input-box { flex: 1; min-width: 180px; }
@@ -20,19 +20,19 @@
         
         button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .export-btn { background-color: #28a745; color: white; margin-right: 10px; }
-        .db-btn { background-color: #6c757d; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; display: inline-block; }
+        .db-btn { background-color: #039be5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; display: inline-block; }
         .clear-btn { background-color: #dc3545; color: white; float: right; font-size: 12px; padding: 5px 10px; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background-color: #333; color: white; }
-        .loading { color: #107c41; font-weight: bold; display: none; }
+        .loading { color: #d32f2f; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Gate Pass Recorder (Office 365)</h2>
+    <h2>Gate Pass Recorder (Firebase)</h2>
 
     <form id="gpForm">
         <div class="form-group">
@@ -66,10 +66,10 @@
                 <input type="number" id="qty" placeholder="0" required>
             </div>
             <div style="align-self: flex-end;">
-                <button type="submit" class="save-btn">Save to Excel</button>
+                <button type="submit" class="save-btn">Save to Database</button>
             </div>
         </div>
-        <p class="loading" id="statusMsg">Sending to OneDrive... Please wait.</p>
+        <p class="loading" id="statusMsg">Connecting to Firebase...</p>
     </form>
 
     <hr>
@@ -77,7 +77,7 @@
     <h3>Recent Local History <button onclick="clearLocalData()" class="clear-btn">Clear History</button></h3>
     <div style="margin-bottom: 15px;">
         <button onclick="exportTableToCSV('GatePass_Report.csv')" class="export-btn">Download CSV</button>
-        <a href="https://www.office.com/launch/excel" target="_blank" class="db-btn">Open Excel Online</a>
+        <a href="https://console.firebase.google.com/" target="_blank" class="db-btn">Open Firebase Console</a>
     </div>
 
     <table id="recordTable">
@@ -88,69 +88,81 @@
     </table>
 </div>
 
-<script>
-    // -------------------------------------------------------
-    // ⚠️ PASTE YOUR POWER AUTOMATE HTTP URL HERE
-    const scriptURL = 'https://654d046e5d09e95289d5d7aad4523f.ab.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/0b2b5d103a6d4da781431b417e4e75ef/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=aPzbyKZ4MwYdxH5UG5GYJN5kBt8_Tsyp0L5miPQrIck'; 
-    // -------------------------------------------------------
+<script type="module">
+    // 1. Import Firebase Functions
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+    // ------------------------------------------------------------------
+    // ⚠️ PASTE YOUR FIREBASE CONFIG HERE (From Part 1, Step 5)
+    // ------------------------------------------------------------------
+    const firebaseConfig = {
+    apiKey: "AIzaSyB8f_IUZTtNM-r4YMEanG4o5jvLlIicdss",
+    authDomain: "gatepasssystem-4e460.firebaseapp.com",
+    projectId: "gatepasssystem-4e460",
+    storageBucket: "gatepasssystem-4e460.firebasestorage.app",
+    messagingSenderId: "560500918758",
+    appId: "1:560500918758:web:7ca4880fe8cd0f96df2e27",
+    measurementId: "G-RV8K6KSJHE"
+  };
+    // ------------------------------------------------------------------
+
+    // 2. Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 3. Get HTML Elements
     const form = document.getElementById('gpForm');
     const statusMsg = document.getElementById('statusMsg');
 
+    // 4. Submit Function
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        statusMsg.style.display = 'block';
+        statusMsg.innerText = "Sending to Firebase...";
+
+        const dataPayload = {
+            Date: document.getElementById('dateEntry').value,
+            GatePassNo: document.getElementById('gpNo').value,
+            Destination: document.getElementById('destination').value,
+            ItemName: document.getElementById('item').value,
+            Quantity: document.getElementById('qty').value,
+            Timestamp: new Date() // Helpful for sorting in database
+        };
+
+        try {
+            // Add data to collection named "gatepass"
+            const docRef = await addDoc(collection(db, "gatepass"), dataPayload);
+            
+            console.log("Document written with ID: ", docRef.id);
+            statusMsg.style.display = 'none';
+            alert("Success! Data saved to Firebase Cloud.");
+
+            // Call the local storage function (which is global scope, see below)
+            window.saveToLocalMemory(dataPayload);
+
+            // Clear inputs
+            document.getElementById('item').value = "";
+            document.getElementById('qty').value = "";
+
+        } catch (e) {
+            console.error("Error adding document: ", e);
+            statusMsg.style.color = 'red';
+            statusMsg.innerText = "Error: " + e.message;
+        }
+    });
+</script>
+
+<script>
     // 1. On Load
     window.onload = function() {
         document.getElementById('dateEntry').valueAsDate = new Date();
         loadLocalTable();
     };
 
-    // 2. Submit Function (Updated for Power Automate JSON)
-    form.addEventListener('submit', e => {
-        e.preventDefault();
-        statusMsg.style.display = 'block';
-
-        // Get values directly by ID
-        const dataPayload = {
-            Date: document.getElementById('dateEntry').value,
-            GatePassNo: document.getElementById('gpNo').value,
-            Destination: document.getElementById('destination').value,
-            ItemName: document.getElementById('item').value,
-            Quantity: document.getElementById('qty').value
-        };
-
-        // Send JSON to Power Automate
-        fetch(scriptURL, { 
-            method: 'POST', 
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dataPayload)
-        })
-        .then(response => {
-            if (response.ok) {
-                statusMsg.style.display = 'none';
-                alert("Success! Data saved to Excel Online.");
-                
-                saveToLocalMemory(dataPayload);
-                
-                // Clear specific fields
-                document.getElementById('item').value = "";
-                document.getElementById('qty').value = "";
-            } else {
-                throw new Error('Network response was not ok.');
-            }
-        })
-        .catch(error => {
-            statusMsg.style.color = 'red';
-            statusMsg.innerText = "Error! Check connection.";
-            console.error('Error!', error.message);
-        });
-    });
-
-    // 3. Save to Local Storage
-    function saveToLocalMemory(data) {
+    // 2. Save to Local Storage (Window scope so Module can access it)
+    window.saveToLocalMemory = function(data) {
         let records = JSON.parse(localStorage.getItem('gp_history')) || [];
-        
-        // Normalize keys for local display
         const record = {
             date: data.Date,
             gp: data.GatePassNo,
@@ -158,13 +170,12 @@
             item: data.ItemName,
             qty: data.Quantity
         };
-
         records.push(record);
         localStorage.setItem('gp_history', JSON.stringify(records));
         loadLocalTable();
     }
 
-    // 4. Load Table
+    // 3. Load Table
     function loadLocalTable() {
         const tbody = document.querySelector('#recordTable tbody');
         tbody.innerHTML = '';
@@ -182,16 +193,16 @@
         });
     }
 
-    // 5. Clear History
-    function clearLocalData() {
+    // 4. Clear History
+    window.clearLocalData = function() {
         if(confirm("Clear local history?")) {
             localStorage.removeItem('gp_history');
             loadLocalTable();
         }
     }
 
-    // 6. Export
-    function exportTableToCSV(filename) {
+    // 5. Export CSV
+    window.exportTableToCSV = function(filename) {
         var csv = [];
         var rows = document.querySelectorAll("table tr");
         for (var i = 0; i < rows.length; i++) {
