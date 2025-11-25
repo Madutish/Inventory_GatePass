@@ -3,36 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gate Pass System (Firebase)</title>
+    <title>Gate Pass System</title>
     <style>
-        /* Your Original CSS styles remain exactly the same */
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #d32f2f; } /* Changed color to Firebase Orange/Red style */
+        .container { max-width: 950px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: relative; }
         
-        .save-btn { background-color: #ffca28; color: #333; } /* Firebase Yellow */
+        /* Header with hidden Admin link */
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h2 { margin: 0; color: #d32f2f; }
+        .admin-icon { text-decoration: none; font-size: 20px; color: #ddd; cursor: pointer; transition: 0.3s; }
+        .admin-icon:hover { color: #555; }
+
+        /* Form Styling */
+        .save-btn { background-color: #ffca28; color: #333; border: none; font-weight: bold; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
         .save-btn:hover { background-color: #ffb300; }
 
         .form-group { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 20px; }
-        .input-box { flex: 1; min-width: 180px; }
+        .input-box { flex: 1; min-width: 150px; }
+        
+        /* Make Description and Remarks wider */
+        .wide-box { flex: 2; min-width: 250px; } 
+
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
         input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         
         button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .export-btn { background-color: #28a745; color: white; margin-right: 10px; }
-        .db-btn { background-color: #039be5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; display: inline-block; }
         .clear-btn { background-color: #dc3545; color: white; float: right; font-size: 12px; padding: 5px 10px; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #333; color: white; }
-        .loading { color: #d32f2f; font-weight: bold; display: none; }
+        .loading { color: #d32f2f; font-weight: bold; display: none; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Gate Pass Recorder (Firebase)</h2>
+    <div class="header-row">
+        <h2>Gate Pass Recorder</h2>
+        <a href="https://console.firebase.google.com/" target="_blank" class="admin-icon" title="Admin Database">⚙️</a>
+    </div>
 
     <form id="gpForm">
         <div class="form-group">
@@ -57,16 +68,22 @@
         </div>
 
         <div class="form-group" style="border:none;">
-            <div class="input-box" style="flex:2;">
+            <div class="input-box wide-box">
                 <label>Item Name</label>
                 <input type="text" id="item" placeholder="Description" required>
             </div>
+
             <div class="input-box">
+                <label>Style No / Remarks</label>
+                <input type="text" id="remarks" placeholder="Optional">
+            </div>
+
+            <div class="input-box" style="flex: 0 0 100px;">
                 <label>Quantity</label>
                 <input type="number" id="qty" placeholder="0" required>
             </div>
             <div style="align-self: flex-end;">
-                <button type="submit" class="save-btn">Save to Database</button>
+                <button type="submit" class="save-btn">Save</button>
             </div>
         </div>
         <p class="loading" id="statusMsg">Connecting to Firebase...</p>
@@ -77,134 +94,126 @@
     <h3>Recent Local History <button onclick="clearLocalData()" class="clear-btn">Clear History</button></h3>
     <div style="margin-bottom: 15px;">
         <button onclick="exportTableToCSV('GatePass_Report.csv')" class="export-btn">Download CSV</button>
-        <a href="https://console.firebase.google.com/" target="_blank" class="db-btn">Open Firebase Console</a>
     </div>
 
     <table id="recordTable">
         <thead>
-            <tr><th>Date</th><th>GP No</th><th>Dest</th><th>Item</th><th>Qty</th></tr>
+            <tr><th>Date</th><th>GP No</th><th>Dest</th><th>Item</th><th>Style/Rem</th><th>Qty</th></tr>
         </thead>
         <tbody></tbody>
     </table>
 </div>
 
 <script type="module">
-    // 1. Import Firebase Functions
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // ------------------------------------------------------------------
-    // ⚠️ PASTE YOUR FIREBASE CONFIG HERE (From Part 1, Step 5)
-    // ------------------------------------------------------------------
+    // -----------------------------------------------------------
+    // ⚠️ PASTE YOUR CONFIG HERE (No changes needed if it worked before)
+    // -----------------------------------------------------------
     const firebaseConfig = {
-    apiKey: "AIzaSyB8f_IUZTtNM-r4YMEanG4o5jvLlIicdss",
-    authDomain: "gatepasssystem-4e460.firebaseapp.com",
-    projectId: "gatepasssystem-4e460",
-    storageBucket: "gatepasssystem-4e460.firebasestorage.app",
-    messagingSenderId: "560500918758",
-    appId: "1:560500918758:web:7ca4880fe8cd0f96df2e27",
-    measurementId: "G-RV8K6KSJHE"
-  };
-    // ------------------------------------------------------------------
+        apiKey: "AIzaSyB8f_IUZTtNM-r4YMEanG4o5jvLlIicdss",
+        authDomain: "gatepasssystem-4e460.firebaseapp.com",
+        projectId: "gatepasssystem-4e460",
+        storageBucket: "gatepasssystem-4e460.firebasestorage.app",
+        messagingSenderId: "560500918758",
+        appId: "1:560500918758:web:7ca4880fe8cd0f96df2e27",
+        measurementId: "G-RV8K6KSJHE"
+    };
+    // -----------------------------------------------------------
 
-    // 2. Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // 3. Get HTML Elements
     const form = document.getElementById('gpForm');
     const statusMsg = document.getElementById('statusMsg');
 
-    // 4. Submit Function
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         statusMsg.style.display = 'block';
         statusMsg.innerText = "Sending to Firebase...";
 
+        // 1. Get Data (Included the new Remarks field)
         const dataPayload = {
             Date: document.getElementById('dateEntry').value,
             GatePassNo: document.getElementById('gpNo').value,
             Destination: document.getElementById('destination').value,
             ItemName: document.getElementById('item').value,
+            Remarks: document.getElementById('remarks').value, // <--- New Field
             Quantity: document.getElementById('qty').value,
-            Timestamp: new Date() // Helpful for sorting in database
+            Timestamp: new Date()
         };
 
         try {
-            // Add data to collection named "gatepass"
             const docRef = await addDoc(collection(db, "gatepass"), dataPayload);
             
-            console.log("Document written with ID: ", docRef.id);
             statusMsg.style.display = 'none';
-            alert("Success! Data saved to Firebase Cloud.");
+            alert("Success! Data saved.");
 
-            // Call the local storage function (which is global scope, see below)
-            window.saveToLocalMemory(dataPayload);
+            window.saveToLocalMemory(dataPayload); 
 
-            // Clear inputs
+            // 2. CLEAR ALL FIELDS (Except Date usually stays)
+            document.getElementById('gpNo').value = "";
+            document.getElementById('destination').value = "";
             document.getElementById('item').value = "";
+            document.getElementById('remarks').value = "";
             document.getElementById('qty').value = "";
+            
+            // Put cursor back in GP No for fast typing
+            document.getElementById('gpNo').focus();
 
         } catch (e) {
-            console.error("Error adding document: ", e);
+            console.error("Error: ", e);
             statusMsg.style.color = 'red';
-            statusMsg.innerText = "Error: " + e.message;
+            statusMsg.innerText = "Firebase Error: " + e.message; 
         }
     });
 </script>
 
 <script>
-    // 1. On Load
     window.onload = function() {
         document.getElementById('dateEntry').valueAsDate = new Date();
         loadLocalTable();
     };
 
-    // 2. Save to Local Storage (Window scope so Module can access it)
     window.saveToLocalMemory = function(data) {
         let records = JSON.parse(localStorage.getItem('gp_history')) || [];
-        const record = {
-            date: data.Date,
-            gp: data.GatePassNo,
-            dest: data.Destination,
-            item: data.ItemName,
-            qty: data.Quantity
-        };
-        records.push(record);
+        // Updated to save Remarks
+        records.push({ 
+            date: data.Date, 
+            gp: data.GatePassNo, 
+            dest: data.Destination, 
+            item: data.ItemName, 
+            rem: data.Remarks, 
+            qty: data.Quantity 
+        });
         localStorage.setItem('gp_history', JSON.stringify(records));
         loadLocalTable();
     }
 
-    // 3. Load Table
     function loadLocalTable() {
         const tbody = document.querySelector('#recordTable tbody');
         tbody.innerHTML = '';
         let records = JSON.parse(localStorage.getItem('gp_history')) || [];
-        
         records.reverse().forEach(rec => {
-            let row = `<tr>
+            // Updated to show Remarks column
+            tbody.innerHTML += `<tr>
                 <td>${rec.date}</td>
                 <td>${rec.gp}</td>
                 <td>${rec.dest}</td>
                 <td>${rec.item}</td>
+                <td>${rec.rem || '-'}</td>
                 <td>${rec.qty}</td>
             </tr>`;
-            tbody.innerHTML += row;
         });
     }
 
-    // 4. Clear History
     window.clearLocalData = function() {
-        if(confirm("Clear local history?")) {
-            localStorage.removeItem('gp_history');
-            loadLocalTable();
-        }
+        if(confirm("Clear local history?")) { localStorage.removeItem('gp_history'); loadLocalTable(); }
     }
 
-    // 5. Export CSV
     window.exportTableToCSV = function(filename) {
-        var csv = [];
-        var rows = document.querySelectorAll("table tr");
+        var csv = []; var rows = document.querySelectorAll("table tr");
         for (var i = 0; i < rows.length; i++) {
             var row = [], cols = rows[i].querySelectorAll("td, th");
             for (var j = 0; j < cols.length; j++) row.push(cols[j].innerText);
@@ -212,11 +221,8 @@
         }
         var csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
         var downloadLink = document.createElement("a");
-        downloadLink.download = filename;
-        downloadLink.href = window.URL.createObjectURL(csvFile);
-        downloadLink.style.display = "none";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
+        downloadLink.download = filename; downloadLink.href = window.URL.createObjectURL(csvFile);
+        downloadLink.style.display = "none"; document.body.appendChild(downloadLink); downloadLink.click();
     }
 </script>
 
