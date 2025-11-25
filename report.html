@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Gate Pass Report</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        h2 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        /* Filter Section */
+        .filter-box { background-color: #e3f2fd; padding: 20px; border-radius: 8px; display: flex; gap: 15px; align-items: flex-end; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #555; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+
+        /* Buttons */
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .load-btn { background-color: #1976d2; color: white; }
+        .load-btn:hover { background-color: #1565c0; }
+        
+        .excel-btn { background-color: #2e7d32; color: white; margin-left: auto; display: none; } /* Hidden until data loads */
+        
+        /* Data Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #333; color: white; position: sticky; top: 0; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        
+        .status { margin-top: 20px; font-weight: bold; color: #d32f2f; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📂 Master Database Report</h2>
+    
+    <div class="filter-box">
+        <div class="input-group">
+            <label>Start Date</label>
+            <input type="date" id="startDate">
+        </div>
+        <div class="input-group">
+            <label>End Date</label>
+            <input type="date" id="endDate">
+        </div>
+        <button onclick="loadData()" class="load-btn">🔍 Load Data from Cloud</button>
+        <button onclick="exportToExcel()" id="exportBtn" class="excel-btn">📥 Download Excel</button>
+    </div>
+
+    <p id="statusMsg" class="status"></p>
+    <p id="countMsg" style="color: #666; font-size: 14px;"></p>
+
+    <table id="reportTable">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>GP No</th>
+                <th>Destination</th>
+                <th>Item Name</th>
+                <th>Remarks</th>
+                <th>Qty</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // -----------------------------------------------------------
+    // ⚠️ PASTE YOUR CONFIG HERE (Same as your entry form)
+    // -----------------------------------------------------------
+    const firebaseConfig = {
+        apiKey: "AIzaSyB8f_IUZTtNM-r4YMEanG4o5jvLlIicdss",
+        authDomain: "gatepasssystem-4e460.firebaseapp.com",
+        projectId: "gatepasssystem-4e460",
+        storageBucket: "gatepasssystem-4e460.firebasestorage.app",
+        messagingSenderId: "560500918758",
+        appId: "1:560500918758:web:7ca4880fe8cd0f96df2e27",
+        measurementId: "G-RV8K6KSJHE"
+    };
+    // -----------------------------------------------------------
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Expose function to window so the HTML button can call it
+    window.loadData = async function() {
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        const status = document.getElementById('statusMsg');
+        const tbody = document.querySelector('#reportTable tbody');
+        const countMsg = document.getElementById('countMsg');
+
+        if(!start || !end) {
+            alert("Please select both Start and End dates.");
+            return;
+        }
+
+        status.innerText = "Connecting to Firebase... Please wait.";
+        tbody.innerHTML = ""; // Clear old data
+
+        try {
+            // 1. Create Query: Get gatepass items between selected dates
+            // Note: We use "Date" field string comparison
+            const q = query(
+                collection(db, "gatepass"),
+                where("Date", ">=", start),
+                where("Date", "<=", end)
+            );
+
+            // 2. Fetch Data
+            const querySnapshot = await getDocs(q);
+            
+            // 3. Display Data
+            let count = 0;
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                const row = `<tr>
+                    <td>${data.Date}</td>
+                    <td>${data.GatePassNo}</td>
+                    <td>${data.Destination}</td>
+                    <td>${data.ItemName}</td>
+                    <td>${data.Remarks || '-'}</td>
+                    <td>${data.Quantity}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+                count++;
+            });
+
+            if(count === 0) {
+                status.innerText = "No records found for this date range.";
+                document.getElementById('exportBtn').style.display = 'none';
+            } else {
+                status.innerText = "";
+                countMsg.innerText = `Found ${count} records.`;
+                document.getElementById('exportBtn').style.display = 'block';
+            }
+
+        } catch (e) {
+            console.error(e);
+            status.innerText = "Error: " + e.message;
+            
+            // Helpful hint for a common Firebase error
+            if(e.message.includes("indexes")) {
+                alert("First time running this query? Check the Console (F12) for a link to create an index.");
+            }
+        }
+    }
+</script>
+
+<script>
+    // Standard Excel Export Script
+    function exportToExcel() {
+        var htmltable = document.getElementById('reportTable');
+        var html = htmltable.outerHTML;
+        window.open('data:application/vnd.ms-excel,' + encodeURIComponent(html));
+    }
+    
+    // Set default dates to Today
+    window.onload = function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+    }
+</script>
+
+</body>
+</html>
