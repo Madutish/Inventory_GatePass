@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gate Pass System (Multi-Item)</title>
+    <title>Gate Pass System (Main)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 20px; }
         .container { max-width: 950px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -34,6 +34,11 @@
         .save-all-btn:hover { background-color: #1b5e20; }
 
         .export-btn { background-color: #28a745; color: white; margin-right: 10px; }
+        
+        /* Purple Report Button */
+        .report-btn { background-color: #673ab7; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; display: inline-block; font-weight: bold; font-size: 13.33px; border:none; }
+        .report-btn:hover { background-color: #512da8; }
+
         .clear-btn { background-color: #dc3545; color: white; float: right; font-size: 12px; padding: 5px 10px; }
         .delete-row-btn { background-color: #ffcdd2; color: #c62828; padding: 5px 10px; font-size: 12px; }
 
@@ -42,10 +47,10 @@
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         
         /* Staging Table (Current items) */
-        #stagingTable th { background-color: #1976d2; color: white; } /* Blue Header */
+        #stagingTable th { background-color: #1976d2; color: white; } 
         
         /* History Table */
-        #recordTable th { background-color: #333; color: white; } /* Grey Header */
+        #recordTable th { background-color: #333; color: white; } 
         
         .loading { color: #d32f2f; font-weight: bold; display: none; margin-top: 10px; text-align: center; }
     </style>
@@ -55,7 +60,7 @@
 <div class="container">
     <div class="header-row">
         <h2>Gate Pass Recorder</h2>
-        <a href="https://console.firebase.google.com/" target="_blank" class="admin-icon" title="Admin Database">⚙️</a>
+        <a href="https://console.firebase.google.com/" target="_blank" class="admin-icon" title="Database Console">⚙️</a>
     </div>
 
     <form id="gpForm">
@@ -116,7 +121,10 @@
     <hr style="margin-top: 40px;">
     
     <h3>Recent History <button onclick="clearLocalData()" class="clear-btn">Clear History</button></h3>
-    <button onclick="exportTableToCSV('GatePass_Report.csv')" class="export-btn">Download CSV</button>
+    <div style="margin-bottom: 15px;">
+        <button onclick="exportTableToCSV('GatePass_Report.csv')" class="export-btn">Download CSV (Local)</button>
+        <a href="report.html" target="_blank" class="report-btn">📂 Open Admin Report</a>
+    </div>
 
     <table id="recordTable">
         <thead>
@@ -131,7 +139,7 @@
     import { getFirestore, collection, writeBatch, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // -----------------------------------------------------------
-    // ⚠️ PASTE YOUR CONFIG HERE
+    // ⚠️ YOUR SPECIFIC CONFIG IS PRE-FILLED HERE
     // -----------------------------------------------------------
     const firebaseConfig = {
         apiKey: "AIzaSyB8f_IUZTtNM-r4YMEanG4o5jvLlIicdss",
@@ -164,26 +172,21 @@
         loadLocalTable();
     };
 
-    // 2. Add Item to Temporary List (Step 2)
+    // 2. Add Item to Temporary List
     function addItemToList() {
-        // Get values
         const item = document.getElementById('item').value;
         const qty = document.getElementById('qty').value;
         const rem = document.getElementById('remarks').value;
 
-        // Basic Validation
         if(item === "" || qty === "") {
             alert("Please fill in Item and Qty");
             return;
         }
 
-        // Add to array
         currentItemsList.push({ item, qty, rem });
-
-        // Update UI
         renderStagingTable();
 
-        // Clear Item fields only (Keep GP No & Dest)
+        // Clear Item fields only
         document.getElementById('item').value = "";
         document.getElementById('qty').value = "";
         document.getElementById('remarks').value = "";
@@ -223,9 +226,8 @@
         renderStagingTable();
     }
 
-    // 5. FINAL SAVE TO FIREBASE (Step 3)
+    // 5. FINAL SAVE TO FIREBASE
     async function saveAllToFirebase() {
-        // Validate Header Info
         const date = document.getElementById('dateEntry').value;
         const gp = document.getElementById('gpNo').value;
         const dest = document.getElementById('destination').value;
@@ -238,16 +240,12 @@
         const statusMsg = document.getElementById('statusMsg');
         statusMsg.style.display = 'block';
 
-        // START BATCH
         const batch = window.writeBatch(window.db);
         const timestamp = new Date();
 
-        // Loop through items and add to batch
         currentItemsList.forEach(line => {
-            // Create a new ref for each line
             const newDocRef = window.doc(window.collection(window.db, "gatepass"));
             
-            // Data Object
             const data = {
                 Date: date,
                 GatePassNo: gp,
@@ -259,23 +257,20 @@
             };
 
             batch.set(newDocRef, data);
-            
-            // Also save to local memory for history table
             saveToLocalMemory(data);
         });
 
         try {
-            // Commit all at once
             await batch.commit();
 
             statusMsg.style.display = 'none';
             alert("Success! Gate Pass Submitted.");
 
-            // Clear Everything
             currentItemsList = [];
             renderStagingTable();
             document.getElementById('gpNo').value = "";
             document.getElementById('destination').value = "";
+            document.getElementById('gpNo').focus();
 
         } catch (e) {
             console.error(e);
@@ -283,7 +278,7 @@
         }
     }
 
-    // 6. Local Storage & History Table (Same as before)
+    // 6. Local Storage & History Table
     function saveToLocalMemory(data) {
         let records = JSON.parse(localStorage.getItem('gp_history')) || [];
         records.push({ date: data.Date, gp: data.GatePassNo, dest: data.Destination, item: data.ItemName, rem: data.Remarks, qty: data.Quantity });
