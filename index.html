@@ -330,6 +330,7 @@
       <div class="btn-group">
         <button class="btn primary" id="searchBtn" type="button">Search</button>
         <button class="btn ghost" id="refreshBtn" type="button">Refresh</button>
+        <button class="btn danger" id="clearSearchBtn" type="button">Clear</button>
         <button class="btn success" id="exportBtn" type="button">Export Excel (CSV)</button>
       </div>
     </div>
@@ -394,7 +395,7 @@
   // ---------- Manual Add (Multiple Items) ----------
   document.getElementById("date").value = todayISO();
 
-  // FIX: Attach items array to the global window object to avoid sync issues
+  // Attach items array to the global window object
   window.currentItems = []; 
 
   function renderItems(){
@@ -513,7 +514,6 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // Global functions from the main script
   const setText = window.setText || ((id, text) => document.getElementById(id).textContent = text);
   const escapeHtml = window.escapeHtml || ((s) => (s ?? "").toString().replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"));
   const normalize = window.normalize || ((s) => (s ?? "").toString().trim().toLowerCase());
@@ -555,7 +555,6 @@
     }
   }
 
-  // FIX: Accessing the items directly from the global window object
   function readItemsFromUI() {
     return Array.isArray(window.currentItems) ? window.currentItems : [];
   }
@@ -604,7 +603,7 @@
     handleSave(true);
   });
 
-  // ---------- FIX: REAL BULK UPLOAD LOGIC ----------
+  // ---------- BULK UPLOAD LOGIC ----------
   document.getElementById("uploadBtn").addEventListener("click", async () => {
     const fileInput = document.getElementById("excelFile");
     const file = fileInput.files[0];
@@ -624,7 +623,6 @@
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
-        // Convert to JSON
         const json = XLSX.utils.sheet_to_json(worksheet);
         
         if (json.length === 0) {
@@ -634,12 +632,11 @@
 
         setText("uploadStatus", `Uploading ${json.length} records to Firebase...`);
 
-        // Group rows by Gate Pass Number so we don't overwrite items
         const gatePasses = {};
         json.forEach(row => {
           const gpNo = row.GatePassNo || row.gatePassNo || row["Gate Pass No"];
           
-          if(!gpNo) return; // skip rows without a gate pass number
+          if(!gpNo) return; 
           
           if (!gatePasses[gpNo]) {
             gatePasses[gpNo] = {
@@ -656,7 +653,6 @@
           });
         });
 
-        // Loop through the grouped objects and send to firestore
         for (const [gatePassNo, data] of Object.entries(gatePasses)) {
            await saveGatePassToFirestore({
              date: data.date,
@@ -667,7 +663,7 @@
         }
 
         setText("uploadStatus", "Upload complete ✅ Saved to Firebase.");
-        fileInput.value = ""; // Clear input
+        fileInput.value = ""; 
         
       } catch (error) {
         console.error(error);
@@ -678,7 +674,7 @@
     reader.readAsArrayBuffer(file);
   });
 
-  // ---------- SEARCH / LOAD ----------
+  // ---------- SEARCH / LOAD / EXPORT ----------
   let allFlatRows = []; 
   let currentViewRows = [];
   let currentSort = { key: "date", dir: "desc" };
@@ -788,6 +784,7 @@
   }
 
   document.getElementById("refreshBtn").addEventListener("click", refreshAndShow);
+  
   document.getElementById("searchBtn").addEventListener("click", async () => {
     if (!allFlatRows.length) await refreshAndShow();
     else {
@@ -798,6 +795,23 @@
       setText("searchStatus", `Showing ${sorted.length} result(s). Sort: ${currentSort.key} (${currentSort.dir}).`);
     }
   });
+
+  // ---------- NEW CLEAR BUTTON EVENT LISTENER ----------
+  document.getElementById("clearSearchBtn").addEventListener("click", () => {
+    // 1. Clear input fields
+    document.getElementById("fromDate").value = "";
+    document.getElementById("toDate").value = "";
+    document.getElementById("factoryFilter").value = "";
+    document.getElementById("q").value = "";
+
+    // 2. Clear the table and reset state
+    currentViewRows = [];
+    document.getElementById("resultsBody").innerHTML = `<tr><td colspan="7" class="hint">No data loaded. Click Refresh or Search.</td></tr>`;
+
+    // 3. Update status
+    setText("searchStatus", "Search cleared. Ready.");
+  });
+  // ---------------------------------------------------
 
   document.querySelectorAll("#tab-search th[data-sort]").forEach(th => {
     th.addEventListener("click", async () => {
