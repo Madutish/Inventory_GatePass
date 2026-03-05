@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gate Pass Tracker</title>
+  <title>Gate Pass Tracker (Firebase)</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
     :root{
       --bg:#0b1220;
@@ -132,33 +135,6 @@
       background:rgba(59,130,246,.12);
       white-space:nowrap;
     }
-    .section-title{
-      margin:0 0 10px;
-      font-size:14px;
-      color:#dbeafe;
-    }
-    .divider{
-      border-top:1px solid var(--border);
-      margin:14px 0;
-    }
-    .mini{
-      font-size:12px;
-      color:var(--muted);
-    }
-    .items-box{
-      border:1px dashed rgba(148,163,184,.35);
-      border-radius:12px;
-      padding:10px;
-      background:rgba(2,6,23,.25);
-    }
-    .items-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom:8px;
-    }
-
     /* ---------- FIXED SEARCH TOOLBAR LAYOUT ---------- */
     .tools{
       display:grid;
@@ -166,7 +142,11 @@
       gap:10px;
       align-items:end;
     }
-    .tools > div{ min-width:0; }
+
+    .tools > div{
+      min-width:0;
+    }
+
     .btn-group{
       display:flex;
       gap:10px;
@@ -174,23 +154,24 @@
       justify-content:flex-end;
       white-space:nowrap;
     }
-    @media (max-width: 1100px){
-      .tools{ grid-template-columns: 1fr 1fr; }
-      .btn-group{ justify-content:flex-start; }
-    }
 
-    @media (max-width:860px){
-      .col-9,.col-8,.col-6,.col-4,.col-3,.col-2{grid-column:span 12}
-      .status{margin-left:0}
+    /* Responsive */
+    @media (max-width: 1100px){
+      .tools{
+        grid-template-columns: 1fr 1fr;
+      }
+      .btn-group{
+        justify-content:flex-start;
+      }
     }
   </style>
 </head>
-
 <body>
+
 <header>
   <div class="wrap">
-    <h1>SMT Apparel - Gate Pass Tracker </h1>
-   
+    <h1>SMT Apparel - Gate Pass Tracker</h1>
+    <div class="sub"></div>
 
     <div class="tabs" role="tablist" aria-label="Gate pass tabs">
       <button class="tab-btn active" data-tab="tab-add" role="tab" aria-selected="true">Manual Add</button>
@@ -202,12 +183,10 @@
 
 <main class="wrap">
 
-  <!-- TAB 1: Manual Add -->
   <section id="tab-add" class="card">
     <h2 class="section-title">Manual Add (Multiple Items Under One Gate Pass)</h2>
 
     <form id="addForm" class="grid" autocomplete="off">
-      <!-- Gate Pass Header -->
       <div class="col-4">
         <label for="date">Date</label>
         <input id="date" name="date" type="date" required />
@@ -231,13 +210,22 @@
 
       <div class="col-12 divider"></div>
 
-      <!-- Item Entry (UPDATED: Description + Qty only) -->
-      <div class="col-9">
+      <div class="col-3">
+        <label for="itemModel">Model</label>
+        <input id="itemModel" type="text" placeholder="Ex: ABC-100" />
+      </div>
+
+      <div class="col-3">
+        <label for="itemPartNo">Part No</label>
+        <input id="itemPartNo" type="text" placeholder="Ex: P-7788" />
+      </div>
+
+      <div class="col-4">
         <label for="itemDesc">Description</label>
         <input id="itemDesc" type="text" placeholder="Ex: Mold plate / Machine part" />
       </div>
 
-      <div class="col-3">
+      <div class="col-2">
         <label for="itemQty">Qty</label>
         <input id="itemQty" type="number" min="0" step="1" placeholder="Ex: 5" />
       </div>
@@ -248,43 +236,40 @@
         <div class="status mini" id="itemsCount">0 item(s) added.</div>
       </div>
 
-      <!-- Items list -->
       <div class="col-12">
         <div class="items-box">
           <div class="items-head">
-            <div class="mini">Items under this Gate Pass</div>
-            <div class="mini" id="itemsHint">Add at least 1 item, then Save Gate Pass.</div>
+            <div class="mini"></div>
+            <div class="mini" id="itemsHint"></div>
           </div>
 
           <table aria-label="Items table">
             <thead>
               <tr>
                 <th>#</th>
+                <th>Model</th>
+                <th>Part No</th>
                 <th>Description</th>
                 <th>Qty</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="itemsBody">
-              <tr><td colspan="4" class="hint">No items yet.</td></tr>
+              <tr><td colspan="6" class="hint">No items yet.</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Save Gate Pass -->
       <div class="col-12 row-actions">
         <button class="btn primary" type="submit">Save Gate Pass</button>
         <button class="btn ghost" type="button" id="saveAddAnother">Save & Start New Gate Pass</button>
         <button class="btn danger" type="reset">Clear Form</button>
         <div id="addStatus" class="status">Ready.</div>
       </div>
-
-     
     </form>
   </section>
 
-  <!-- TAB 2: Bulk Upload (DO NOT CHANGE) -->
   <section id="tab-upload" class="card hide">
     <h2 style="margin:0 0 12px;font-size:16px;">Bulk Upload (Excel)</h2>
 
@@ -309,15 +294,9 @@
       <div class="col-12">
         <div id="uploadStatus" class="status">No file selected.</div>
       </div>
-
-      <div class="col-12 hint">
-        Backend/API needed for real Excel import (this section unchanged):
-        <code style="color:#c7d2fe;">POST /api/gatepasses/import</code> with form-data file=<i>excel</i>
-      </div>
     </div>
   </section>
 
-  <!-- TAB 3: Search / Export (UPDATED: Description + Qty only) -->
   <section id="tab-search" class="card hide">
     <h2 style="margin:0 0 12px;font-size:16px;">Search / Export</h2>
 
@@ -326,10 +305,12 @@
         <label for="fromDate">From</label>
         <input id="fromDate" type="date" />
       </div>
+
       <div>
         <label for="toDate">To</label>
         <input id="toDate" type="date" />
       </div>
+
       <div>
         <label for="factoryFilter">Send FTY</label>
         <select id="factoryFilter">
@@ -340,10 +321,12 @@
           <option>Factory 05</option>
         </select>
       </div>
+
       <div>
-        <label for="q">Search (Gate Pass No / Description)</label>
+        <label for="q">Search (Gate Pass No / Model / Part No / Description)</label>
         <input id="q" type="text" placeholder="Type text and press Search..." />
       </div>
+
       <div class="btn-group">
         <button class="btn primary" id="searchBtn" type="button">Search</button>
         <button class="btn ghost" id="refreshBtn" type="button">Refresh</button>
@@ -351,15 +334,13 @@
       </div>
     </div>
 
-    <div class="hint" style="margin-top:10px;">
-      This loads data from Firestore and filters in the browser.
-    </div>
-
     <table aria-label="Gate pass results">
       <thead>
         <tr>
           <th style="cursor:pointer" data-sort="date">Date</th>
           <th style="cursor:pointer" data-sort="gatePassNo">Gate Pass No</th>
+          <th style="cursor:pointer" data-sort="model">Model</th>
+          <th style="cursor:pointer" data-sort="partNo">Part No</th>
           <th style="cursor:pointer" data-sort="description">Description</th>
           <th style="cursor:pointer" data-sort="qty">Qty</th>
           <th style="cursor:pointer" data-sort="sendFty">Send FTY</th>
@@ -367,14 +348,13 @@
       </thead>
       <tbody id="resultsBody">
         <tr>
-          <td colspan="5" class="hint">No data loaded. Click Refresh or Search.</td>
+          <td colspan="7" class="hint">No data loaded. Click Refresh or Search.</td>
         </tr>
       </tbody>
     </table>
 
     <div id="searchStatus" class="status" style="margin-top:10px;">Ready.</div>
   </section>
-
 </main>
 
 <script>
@@ -398,12 +378,15 @@
   // ---------- Tabs ----------
   const tabButtons = document.querySelectorAll(".tab-btn");
   const tabs = ["tab-add","tab-upload","tab-search"];
+
   tabButtons.forEach(btn => {
     btn.addEventListener("click", () => {
       tabButtons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
+
       tabs.forEach(t => document.getElementById(t).classList.add("hide"));
       document.getElementById(btn.dataset.tab).classList.remove("hide");
+
       tabButtons.forEach(b => b.setAttribute("aria-selected", b === btn ? "true" : "false"));
     });
   });
@@ -411,8 +394,8 @@
   // ---------- Manual Add (Multiple Items) ----------
   document.getElementById("date").value = todayISO();
 
-  // IMPORTANT: keep on window so module can read it
-  window.currentItems = [];
+  // FIX: Attach items array to the global window object to avoid sync issues
+  window.currentItems = []; 
 
   function renderItems(){
     const body = document.getElementById("itemsBody");
@@ -420,7 +403,7 @@
     setText("itemsCount", `${count} item(s) added.`);
 
     if(count === 0){
-      body.innerHTML = `<tr><td colspan="4" class="hint">No items yet.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="6" class="hint">No items yet.</td></tr>`;
       return;
     }
 
@@ -429,6 +412,8 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${idx + 1}</td>
+        <td>${escapeHtml(it.model)}</td>
+        <td>${escapeHtml(it.partNo)}</td>
         <td>${escapeHtml(it.description)}</td>
         <td>${escapeHtml(it.qty)}</td>
         <td><button class="btn danger" type="button" data-remove="${idx}" style="padding:6px 10px;font-size:12px;">Remove</button></td>
@@ -446,12 +431,14 @@
   }
 
   document.getElementById("addItemBtn").addEventListener("click", () => {
+    const model = document.getElementById("itemModel").value.trim();
+    const partNo = document.getElementById("itemPartNo").value.trim();
     const description = document.getElementById("itemDesc").value.trim();
     const qtyRaw = document.getElementById("itemQty").value;
     const qty = Number(qtyRaw);
 
-    if(!description){
-      setText("addStatus", "Please enter item Description.");
+    if(!description && !model && !partNo){
+      setText("addStatus", "Please fill at least Model or Part No or Description for the item.");
       return;
     }
     if(Number.isNaN(qty) || qty <= 0){
@@ -459,12 +446,15 @@
       return;
     }
 
-    window.currentItems.push({ description, qty });
+    window.currentItems.push({ model, partNo, description, qty });
     renderItems();
 
+    // clear item inputs
+    document.getElementById("itemModel").value = "";
+    document.getElementById("itemPartNo").value = "";
     document.getElementById("itemDesc").value = "";
     document.getElementById("itemQty").value = "";
-    document.getElementById("itemDesc").focus();
+    document.getElementById("itemModel").focus();
 
     setText("addStatus", "Item added ✅");
   });
@@ -486,24 +476,14 @@
 
   renderItems();
 
-  // ---------- Bulk Upload (UNCHANGED UI) ----------
+  // ---------- Bulk Upload File Handling ----------
   const excelFile = document.getElementById("excelFile");
   excelFile.addEventListener("change", () => {
     setText("uploadStatus", excelFile.files?.[0] ? `Selected: ${excelFile.files[0].name}` : "No file selected.");
   });
 
-  document.getElementById("uploadBtn").addEventListener("click", async () => {
-    if(!excelFile.files || !excelFile.files[0]){
-      setText("uploadStatus","Please select an Excel file.");
-      return;
-    }
-    setText("uploadStatus","Uploading...");
-    await new Promise(r => setTimeout(r, 600));
-    setText("uploadStatus","Upload complete ✅ (demo).");
-  });
-
   document.getElementById("downloadTemplateBtn").addEventListener("click", () => {
-    const csv = "Date,GatePassNo,Description,Qty,SendFTY\n2026-02-23,GP-0001,Mold plate,2,Factory 01\n";
+    const csv = "Date,GatePassNo,Model,PartNo,Description,Qty,SendFTY\n2026-02-23,GP-0001,ABC-100,P-7788,Mold plate,2,Factory 01\n";
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -514,22 +494,12 @@
   });
 </script>
 
-<!-- Firebase + Firestore (Module) -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
   import {
-    getFirestore,
-    doc,
-    setDoc,
-    getDoc,
-    getDocs,
-    collection,
-    query,
-    orderBy,
-    serverTimestamp
+    getFirestore, doc, setDoc, getDoc, getDocs, collection, query, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-  // ----------------- YOUR CONFIG -----------------
   const firebaseConfig = {
     apiKey: "AIzaSyB8f_IUZTtNM-r4YMEanG4o5jvLlIicdss",
     authDomain: "gatepasssystem-4e460.firebaseapp.com",
@@ -543,15 +513,16 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  const setText = (id, text) => document.getElementById(id).textContent = text;
-  const normalize = (s) => (s ?? "").toString().trim().toLowerCase();
+  // Global functions from the main script
+  const setText = window.setText || ((id, text) => document.getElementById(id).textContent = text);
+  const escapeHtml = window.escapeHtml || ((s) => (s ?? "").toString().replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"));
+  const normalize = window.normalize || ((s) => (s ?? "").toString().trim().toLowerCase());
 
   // ---------- SAVE Gate Pass ----------
   const addForm = document.getElementById("addForm");
   const saveAddAnotherBtn = document.getElementById("saveAddAnother");
 
   async function saveGatePassToFirestore({ date, gatePassNo, sendFty, items }) {
-    // Document ID = GatePassNo (append items if exists)
     const docId = gatePassNo;
     const ref = doc(db, "gatepasses", docId);
     const existing = await getDoc(ref);
@@ -584,11 +555,17 @@
     }
   }
 
+  // FIX: Accessing the items directly from the global window object
+  function readItemsFromUI() {
+    return Array.isArray(window.currentItems) ? window.currentItems : [];
+  }
+
   async function handleSave(clearAfter) {
     const date = addForm.date.value;
     const gatePassNo = addForm.gatePassNo.value.trim();
     const sendFty = addForm.sendFty.value;
-    const items = window.currentItems;
+
+    const items = readItemsFromUI();
 
     if (!date || !gatePassNo || !sendFty) {
       setText("addStatus", "Please fill Date, Gate Pass No and Send FTY.");
@@ -602,18 +579,16 @@
     setText("addStatus", "Saving to Firebase...");
     try {
       const result = await saveGatePassToFirestore({ date, gatePassNo, sendFty, items });
+
       if (result.mode === "created") {
         setText("addStatus", `Saved ✅ (New) Items: ${result.added}`);
       } else {
-        setText("addStatus", `Saved ✅ (Appended) Added: ${result.added}, Total items: ${result.total}`);
+        setText("addStatus", `Saved ✅ (Appended to existing) Added: ${result.added}, Total: ${result.total}`);
       }
 
-      // After successful save, clear items list so you don't accidentally re-save same items
-      window.currentItems = [];
-      // re-render items (function in non-module scope)
-      window.dispatchEvent(new Event("itemsChanged"));
-
-      if (clearAfter) addForm.reset();
+      if (clearAfter) {
+        addForm.reset();
+      }
     } catch (e) {
       console.error(e);
       setText("addStatus", "Save failed ❌ Check Firestore rules / internet.");
@@ -625,10 +600,86 @@
     handleSave(false);
   });
 
-  saveAddAnotherBtn.addEventListener("click", () => handleSave(true));
+  saveAddAnotherBtn.addEventListener("click", () => {
+    handleSave(true);
+  });
+
+  // ---------- FIX: REAL BULK UPLOAD LOGIC ----------
+  document.getElementById("uploadBtn").addEventListener("click", async () => {
+    const fileInput = document.getElementById("excelFile");
+    const file = fileInput.files[0];
+    
+    if (!file) {
+      setText("uploadStatus", "Please select an Excel file.");
+      return;
+    }
+
+    setText("uploadStatus", "Reading Excel file...");
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert to JSON
+        const json = XLSX.utils.sheet_to_json(worksheet);
+        
+        if (json.length === 0) {
+          setText("uploadStatus", "The Excel file is empty.");
+          return;
+        }
+
+        setText("uploadStatus", `Uploading ${json.length} records to Firebase...`);
+
+        // Group rows by Gate Pass Number so we don't overwrite items
+        const gatePasses = {};
+        json.forEach(row => {
+          const gpNo = row.GatePassNo || row.gatePassNo || row["Gate Pass No"];
+          
+          if(!gpNo) return; // skip rows without a gate pass number
+          
+          if (!gatePasses[gpNo]) {
+            gatePasses[gpNo] = {
+              date: row.Date || row.date || window.todayISO?.() || new Date().toISOString().slice(0,10),
+              sendFty: row.SendFTY || row.sendFty || row["Send FTY"] || "Unknown",
+              items: []
+            };
+          }
+          gatePasses[gpNo].items.push({
+            model: row.Model || row.model || "",
+            partNo: row.PartNo || row.partNo || row["Part No"] || "",
+            description: row.Description || row.description || "",
+            qty: row.Qty || row.qty || 1
+          });
+        });
+
+        // Loop through the grouped objects and send to firestore
+        for (const [gatePassNo, data] of Object.entries(gatePasses)) {
+           await saveGatePassToFirestore({
+             date: data.date,
+             gatePassNo: gatePassNo,
+             sendFty: data.sendFty,
+             items: data.items
+           });
+        }
+
+        setText("uploadStatus", "Upload complete ✅ Saved to Firebase.");
+        fileInput.value = ""; // Clear input
+        
+      } catch (error) {
+        console.error(error);
+        setText("uploadStatus", "Error processing file. Ensure it matches the template.");
+      }
+    };
+    
+    reader.readAsArrayBuffer(file);
+  });
 
   // ---------- SEARCH / LOAD ----------
-  let allFlatRows = []; // one row per item
+  let allFlatRows = []; 
   let currentViewRows = [];
   let currentSort = { key: "date", dir: "desc" };
 
@@ -645,6 +696,8 @@
           date: gp.date ?? "",
           gatePassNo: gp.gatePassNo ?? d.id,
           sendFty: gp.sendFty ?? "",
+          model: it.model ?? "",
+          partNo: it.partNo ?? "",
           description: it.description ?? "",
           qty: it.qty ?? ""
         });
@@ -658,6 +711,7 @@
   function compare(a, b, key) {
     const av = (a[key] ?? "").toString();
     const bv = (b[key] ?? "").toString();
+
     if (key === "qty") {
       const an = Number(av), bn = Number(bv);
       if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
@@ -685,7 +739,9 @@
       if (factory && r.sendFty !== factory) return false;
 
       if (q) {
-        const hay = normalize(`${r.gatePassNo} ${r.description} ${r.sendFty}`);
+        const hay = normalize(
+          `${r.gatePassNo} ${r.model} ${r.partNo} ${r.description} ${r.sendFty}`
+        );
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -697,18 +753,20 @@
     body.innerHTML = "";
 
     if (!rows || rows.length === 0) {
-      body.innerHTML = `<tr><td colspan="5" class="hint">No results.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="7" class="hint">No results.</td></tr>`;
       return;
     }
 
     for (const r of rows) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${r.date ?? ""}</td>
-        <td><b>${r.gatePassNo ?? ""}</b></td>
-        <td>${r.description ?? ""}</td>
-        <td>${r.qty ?? ""}</td>
-        <td><span class="pill">${r.sendFty ?? ""}</span></td>
+        <td>${escapeHtml(r.date)}</td>
+        <td><b>${escapeHtml(r.gatePassNo)}</b></td>
+        <td>${escapeHtml(r.model)}</td>
+        <td>${escapeHtml(r.partNo)}</td>
+        <td>${escapeHtml(r.description)}</td>
+        <td>${escapeHtml(r.qty)}</td>
+        <td><span class="pill">${escapeHtml(r.sendFty)}</span></td>
       `;
       body.appendChild(tr);
     }
@@ -730,7 +788,6 @@
   }
 
   document.getElementById("refreshBtn").addEventListener("click", refreshAndShow);
-
   document.getElementById("searchBtn").addEventListener("click", async () => {
     if (!allFlatRows.length) await refreshAndShow();
     else {
@@ -759,15 +816,15 @@
     });
   });
 
-  // Export current view to CSV
   document.getElementById("exportBtn").addEventListener("click", () => {
     const rows = currentViewRows.length ? currentViewRows : applySort(applyFilters(allFlatRows));
-    const header = ["Date","GatePassNo","Description","Qty","SendFTY"];
+
+    const header = ["Date","GatePassNo","Model","PartNo","Description","Qty","SendFTY"];
     const lines = [header.join(",")];
 
     for (const r of rows) {
       const line = [
-        r.date, r.gatePassNo, r.description, r.qty, r.sendFty
+        r.date, r.gatePassNo, r.model, r.partNo, r.description, r.qty, r.sendFty
       ].map(v => {
         const s = (v ?? "").toString().replaceAll('"','""');
         return `"${s}"`;
@@ -783,27 +840,7 @@
     a.click();
     URL.revokeObjectURL(url);
   });
-
-  // ---- Bridge event to re-render items when module clears them
-  window.addEventListener("itemsChanged", () => {
-    // call renderItems from non-module scope if it exists
-    if (typeof window.renderItems === "function") window.renderItems();
-    else {
-      // fallback: refresh page items area
-      const body = document.getElementById("itemsBody");
-      body.innerHTML = `<tr><td colspan="4" class="hint">No items yet.</td></tr>`;
-      setText("itemsCount", `0 item(s) added.`);
-    }
-  });
-</script>
-
-<script>
-  // Expose renderItems globally so module can call it
-  // (small fix: make renderItems accessible on window)
-  window.renderItems = window.renderItems || (() => {});
 </script>
 
 </body>
 </html>
-
-
